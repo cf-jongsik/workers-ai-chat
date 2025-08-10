@@ -1,69 +1,75 @@
-# React + TypeScript + Vite
+# Workers AI Chat
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A minimal chat UI powered by Cloudflare Workers AI. The React frontend sends messages to a Cloudflare Worker endpoint (`/chat`), which calls a Workers AI text model and returns a concise response.
 
-Currently, two official plugins are available:
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cf-jongsik/workers-ai-chat)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features
 
-## Expanding the ESLint configuration
+- **Chat UI** with `@chatui/core`
+- **Cloudflare Worker** handles `POST /chat`
+- **Workers AI** model `@cf/openai/gpt-oss-120b`
+- **Vite + React (TS)** dev/build tooling
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Prerequisites
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Node.js 18+ and npm
+- Cloudflare account with Workers enabled
+- Workers AI enabled on your account (no API key required when using the `AI` binding)
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+## Getting Started
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1. Install deps
+   ```bash
+   npm install
+   ```
+2. Login to Cloudflare (once per machine)
+   ```bash
+   npx wrangler login
+   ```
+3. Deploy
+   ```bash
+   npm run deploy
+   ```
+
+## How it works
+
+- Frontend (`src/ChatPage.tsx`)
+  - Sends `POST /chat` with JSON `{ messages, prompt }`.
+  - Renders assistant responses in the chat list.
+- Worker (`worker/index.ts`)
+  - Parses the request, converts chat messages into model input, and calls:
+    ```ts
+    const response = await ai.run("@cf/openai/gpt-oss-120b", {
+      instructions: "you are a concise assistant",
+      input: JSON.stringify(inputJSON),
+    });
+    ```
+  - Returns the AI output as JSON.
+
+## Project Structure
+
+```
+.
+├─ src/
+│  ├─ ChatPage.tsx        # Chat UI and /chat client
+│  ├─ App.tsx, main.tsx   # App bootstrap
+│  ├─ types.d.ts          # UI message types
+├─ worker/
+│  ├─ index.ts            # Cloudflare Worker (POST /chat)
+│  └─ types.d.ts
+├─ index.html             # App entry
+├─ vite.config.ts         # Vite + Cloudflare plugin
+├─ wrangler.jsonc         # Worker + AI binding config
+├─ eslint.config.js
+├─ tsconfig*.json
+├─ package.json
+└─ pnpm-lock.yaml
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Notes
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- The Worker currently uses `@cf/openai/gpt-oss-120b`. You can swap to other Workers AI text models; see Cloudflare docs for available models and input schemas.
+- Responses are intentionally concise by design.
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+---
