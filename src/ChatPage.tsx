@@ -1,5 +1,6 @@
 import Chat, { Bubble, useMessages, type MessageProps } from "@chatui/core";
 import "@chatui/core/dist/index.css";
+import MarkDownToJSX from "markdown-to-jsx";
 
 export function ChatPage() {
   const { messages, appendMsg } = useMessages([]);
@@ -40,7 +41,11 @@ export function ChatPage() {
 
   function renderMessageContent(msg: MessageProps) {
     const { content } = msg;
-    return <Bubble content={content.text} />;
+    return (
+      <Bubble>
+        <MarkDownToJSX>{content.text}</MarkDownToJSX>
+      </Bubble>
+    );
   }
 
   return (
