@@ -22,5 +22,9 @@ body,
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  padding: 0px;
+  overflow: hidden;
+  position: fixed;
+  width: 100dvw;
+  height: 100dvh;
 }
