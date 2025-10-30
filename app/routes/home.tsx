@@ -15,8 +15,17 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (upgrade === "websocket") {
     await routeAgentRequest(request, context.cloudflare.env);
   }
-  const id = ChatAgent.idFromName("default");
-  return { agentName: "ChatAgent", roomId: id.name || "default" };
+  const jwt = request.headers.get("Cf-Access-Jwt-Assertion");
+  if (jwt) {
+    const [_header, payload, _signature] = jwt.split(".");
+    const payloadJson = JSON.parse(atob(payload)) as JWT;
+    const email = payloadJson.email;
+    const id = ChatAgent.idFromName(email);
+    return { agentName: "ChatAgent", roomId: id.toString() };
+  } else {
+    const id = ChatAgent.newUniqueId();
+    return { agentName: "ChatAgent", roomId: id.toString() };
+  }
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {

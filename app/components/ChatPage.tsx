@@ -84,6 +84,11 @@ export function ChatPage({
     [sendMsg]
   );
 
+  const handleClearHistory = useCallback(() => {
+    setMessages([]);
+    agent.setState({ messages: [], lastUpdate: new Date() });
+  }, [agent]);
+
   return (
     <div
       className="flex flex-col h-screen bg-linear-to-br from-black via-slate-950 to-black"
@@ -93,7 +98,7 @@ export function ChatPage({
         className="bg-black/60 backdrop-blur-lg border-b border-white/5 px-6 py-4 shadow-xl"
         role="banner"
       >
-        <div className="max-w-5xl mx-auto flex items-center gap-3">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div
             className="w-10 h-10 rounded-xl bg-linear-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg"
             aria-label="Chat application logo"
@@ -119,6 +124,29 @@ export function ChatPage({
               Powered by Cloudflare Workers AI
             </p>
           </div>
+          <button
+            type="button"
+            className="px-4 py-2 bg-red-600/80 hover:bg-red-500 text-white font-medium rounded-lg transition-colors shadow-md hover:shadow-lg flex items-center gap-2"
+            aria-label="Clear chat history"
+            id="clear-history-btn"
+            onClick={handleClearHistory}
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+            <span>Clear History</span>
+          </button>
         </div>
       </header>
 
