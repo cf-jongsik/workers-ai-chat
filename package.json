@@ -1,36 +1,43 @@
 {
   "name": "workers-ai-chat",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "pnpm run build && vite preview",
+    "build": "react-router build",
+    "cf-typegen": "wrangler types",
     "deploy": "pnpm run build && wrangler deploy",
-    "cf-typegen": "wrangler types"
+    "dev": "react-router dev",
+    "postinstall": "npm run cf-typegen",
+    "preview": "pnpm run build && vite preview",
+    "typecheck": "npm run cf-typegen && react-router typegen && tsc -b",
+    "lint": "eslint ."
   },
   "dependencies": {
-    "@chatui/core": "^3.0.1",
-    "markdown-to-jsx": "^7.7.13",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "@ai-sdk/react": "^2.0.82",
+    "agents": "^0.2.19",
+    "ai": "^5.0.82",
+    "markdown-to-jsx": "^8.0.0",
+    "react": "^19.2.0",
+    "isbot": "^5.1.31",
+    "react-dom": "^19.2.0",
+    "react-router": "^7.9.5"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.11.5",
-    "@eslint/js": "^9.33.0",
-    "@types/react": "^19.1.10",
-    "@types/react-dom": "^19.1.7",
-    "@vitejs/plugin-react": "^5.0.0",
-    "eslint": "^9.33.0",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.20",
-    "globals": "^16.3.0",
-    "typescript": "~5.9.2",
-    "typescript-eslint": "^8.39.1",
-    "vite": "^7.1.2",
-    "wrangler": "^4.30.0"
+    "@cloudflare/vite-plugin": "^1.13.17",
+    "@eslint/js": "^9.38.0",
+    "@tailwindcss/vite": "^4.1.16",
+    "@react-router/dev": "^7.9.5",
+    "@types/node": "^24.9.2",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "eslint": "^9.38.0",
+    "tailwindcss": "^4.1.16",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.2",
+    "vite": "^7.1.12",
+    "vite-tsconfig-paths": "^5.1.4",
+    "wrangler": "^4.45.2"
   },
-  "packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748"
+  "packageManager": "pnpm@10.20.0+sha512.cf9998222162dd85864d0a8102e7892e7ba4ceadebbf5a31f9c2fce48dfce317a9c53b9f6464d1ef9042cba2e02ae02a9f7c143a2b438cd93c91840f0192b9dd"
 }
