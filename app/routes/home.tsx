@@ -1,11 +1,11 @@
 import type { Route } from "./+types/home";
 import { ChatPage } from "../components/ChatPage";
-import { routeAgentRequest, getAgentByName } from "agents";
+import { routeAgentRequest } from "agents";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "test agent" },
-    { name: "description", content: "testing agent!" },
+    { title: "Workers AI Chat" },
+    { name: "description", content: "Workers AI Chat" },
   ];
 }
 
@@ -15,8 +15,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (upgrade === "websocket") {
     await routeAgentRequest(request, context.cloudflare.env);
   }
-  const id = await getAgentByName(ChatAgent, crypto.randomUUID());
-  return { agentName: "ChatAgent", roomId: id.id.toString() };
+  const id = ChatAgent.idFromName("default");
+  return { agentName: "ChatAgent", roomId: id.name || "default" };
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
