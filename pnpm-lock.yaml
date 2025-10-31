@@ -17,9 +17,15 @@ importers:
       ai:
         specifier: ^5.0.83
         version: 5.0.83(zod@3.25.76)
+      cookie:
+        specifier: ^1.0.2
+        version: 1.0.2
       isbot:
         specifier: ^5.1.31
         version: 5.1.31
+      jose:
+        specifier: ^6.1.0
+        version: 6.1.0
       markdown-to-jsx:
         specifier: ^8.0.0
         version: 8.0.0(react@19.2.0)
@@ -1772,6 +1778,9 @@ packages:
   jiti@2.6.1:
     resolution: {integrity: sha512-ekilCSN1jwRvIbgeg/57YFh8qQDNbwDb9xT/qu2DAHbFFZUicIl4ygVaAvzveMhMVr3LnpSKTNnwt8PoOfmKhQ==}
     hasBin: true
+
+  jose@6.1.0:
+    resolution: {integrity: sha512-TTQJyoEoKcC1lscpVDCSsVgYzUDg/0Bt3WE//WiTPK6uOCQC2KZS4MpugbMWt/zyjkopgZoXhZuCi00gLudfUA==}
 
   js-base64@3.7.8:
     resolution: {integrity: sha512-hNngCeKxIUQiEUN3GPJOkz4wF/YvdUdbNL9hsBcMQTkKzboD7T/q3OYOuuPZLUE6dBxSGpwhk5mwuDud7JVAow==}
@@ -4242,6 +4251,8 @@ snapshots:
       '@pkgjs/parseargs': 0.11.0
 
   jiti@2.6.1: {}
+
+  jose@6.1.0: {}
 
   js-base64@3.7.8: {}
 

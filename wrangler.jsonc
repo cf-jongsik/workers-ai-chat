@@ -18,6 +18,10 @@
       }
     ]
   },
+  "vars": {
+    // "TEAM_DOMAIN": "my-team-DOMAIN", // eg: https://my-team-name.cloudflareaccess.com ADD this to secret
+    // "POLICY_AUD": "AUD-tag" // eg: 44r4f423f24f12r13re13r13rfwedfrg2fr24fr ADD this to secret
+  },
   "migrations": [
     {
       "tag": "v1",

@@ -36,7 +36,6 @@ export function ChatPage({
       setMessages((prev) => [...prev, msgWithId]);
       setError(false); // Reset error state on new message
       setIsLoading(false); // Reset loading state
-      console.log("client got msg", message);
       setReady(true);
     },
     onError(event) {

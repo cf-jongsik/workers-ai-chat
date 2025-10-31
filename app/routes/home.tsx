@@ -1,6 +1,8 @@
 import type { Route } from "./+types/home";
 import { ChatPage } from "../components/ChatPage";
 import { routeAgentRequest } from "agents";
+import { jwtVerify, createRemoteJWKSet } from "jose";
+import { parse } from "cookie";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -10,20 +12,48 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const { ChatAgent } = context.cloudflare.env;
   const upgrade = request.headers.get("Upgrade");
   if (upgrade === "websocket") {
     await routeAgentRequest(request, context.cloudflare.env);
   }
-  const jwt = request.headers.get("Cf-Access-Jwt-Assertion");
-  if (jwt) {
-    const [_header, payload, _signature] = jwt.split(".");
-    const payloadJson = JSON.parse(atob(payload)) as JWT;
-    const email = payloadJson.email;
+  const cookie = parse(request.headers.get("Cookie") || "");
+  const token =
+    cookie["CF_Authorization"] ||
+    request.headers.get("Cf-Access-Jwt-Assertion");
+  const { ChatAgent, TEAM_DOMAIN, POLICY_AUD } = context.cloudflare.env;
+  console.log({ token, TEAM_DOMAIN, POLICY_AUD });
+
+  try {
+    if (!token || !TEAM_DOMAIN || !POLICY_AUD) {
+      throw new Error("Missing token or TEAM_DOMAIN or POLICY_AUD");
+    }
+
+    const JWKS = createRemoteJWKSet(
+      new URL(`${TEAM_DOMAIN}/cdn-cgi/access/certs`)
+    );
+
+    // Verify the JWT
+    const { payload } = await jwtVerify<JWT>(token, JWKS, {
+      issuer: TEAM_DOMAIN,
+      audience: POLICY_AUD,
+    });
+
+    const email = payload.email;
+    if (!email) {
+      throw new Error("Invalid JWT");
+    }
+    console.log("validation success", { email });
     const id = ChatAgent.idFromName(email);
+    console.log("entering room", { email, id: id.toString(), name: id.name });
     return { agentName: "ChatAgent", roomId: id.toString() };
-  } else {
+  } catch (e) {
+    console.error(e);
     const id = ChatAgent.newUniqueId();
+    console.log("entering room", {
+      email: "unknown",
+      id: id.toString(),
+      name: id.name,
+    });
     return { agentName: "ChatAgent", roomId: id.toString() };
   }
 }
