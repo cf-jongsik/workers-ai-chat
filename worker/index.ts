@@ -139,7 +139,7 @@ export class ChatAgent extends Agent<Env, chatAgentState> {
         response = (await AI.run("@cf/openai/gpt-oss-120b", {
           instructions: prompt,
           input: conversationHistory,
-        })) as returnMSG;
+        })) as unknown as returnMSG;
         console.log("AI service responded successfully");
       } catch (aiError) {
         console.error("AI service error:", aiError);
