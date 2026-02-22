@@ -1,24 +1,133 @@
 import MarkDownToJSX from "markdown-to-jsx";
-import { useState } from "react";
+import { Children, useMemo, useState } from "react";
 
 // Avatar styles based on message type and error state
 const getAvatarStyles = (role: string, hasError: boolean) => {
   if (role === "user") {
     return "bg-linear-to-br from-blue-500 to-cyan-500";
   }
-  return hasError
-    ? "bg-linear-to-br from-red-500 to-orange-500"
+  return hasError ?
+      "bg-linear-to-br from-red-500 to-orange-500"
     : "bg-linear-to-br from-orange-500 to-amber-500";
 };
 
 // Message bubble styles based on message type and error state
 const getBubbleStyles = (role: string, hasError: boolean) => {
   if (role === "user") {
-    return "bg-linear-to-br from-blue-600 to-cyan-600 text-white";
+    return "bg-linear-to-br from-sky-600 to-cyan-600 text-white border border-cyan-300/30";
   }
-  return hasError
-    ? "bg-red-500/10 border border-red-500/30 text-red-100"
-    : "bg-zinc-900/80 backdrop-blur-sm border border-white/5 text-gray-100";
+  return hasError ?
+      "bg-red-500/10 border border-red-500/30 text-red-100"
+    : "bg-zinc-900/85 backdrop-blur-sm border border-white/10 text-gray-100";
+};
+
+const getBubbleRadiusStyles = (role: string) => {
+  if (role === "user") {
+    return "rounded-3xl rounded-br-lg";
+  }
+  return "rounded-3xl rounded-bl-lg";
+};
+
+const stringifyUnknown = (value: unknown) => {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+};
+
+const toCodeText = (value: unknown): string => {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => toCodeText(item)).join("");
+  }
+
+  if (value == null) {
+    return "";
+  }
+
+  return String(value);
+};
+
+const getLanguageFromClassName = (className?: string) => {
+  if (!className) {
+    return "";
+  }
+
+  const match = className.match(/(?:language|lang)-([\w-]+)/i);
+  return match?.[1] ?? "";
+};
+
+const toMarkdownPart = (part: unknown): string => {
+  if (typeof part === "string") {
+    return part;
+  }
+
+  if (part == null) {
+    return "";
+  }
+
+  if (Array.isArray(part)) {
+    return part
+      .map((item) => toMarkdownPart(item))
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  if (typeof part !== "object") {
+    return String(part);
+  }
+
+  const partRecord = part as Record<string, unknown>;
+
+  if (typeof partRecord.text === "string") {
+    return partRecord.text;
+  }
+
+  if (typeof partRecord.reasoning === "string") {
+    return partRecord.reasoning;
+  }
+
+  if (typeof partRecord.content === "string") {
+    return partRecord.content;
+  }
+
+  if (Array.isArray(partRecord.content)) {
+    return partRecord.content
+      .map((item) => toMarkdownPart(item))
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  if (partRecord.type === "tool-call") {
+    const toolName =
+      typeof partRecord.toolName === "string" ? partRecord.toolName : "tool";
+    return `**Tool call - \`${toolName}\`**\n\n\`\`\`json\n${stringifyUnknown(partRecord.args ?? {})}\n\`\`\``;
+  }
+
+  if (partRecord.type === "tool-result") {
+    const toolName =
+      typeof partRecord.toolName === "string" ? partRecord.toolName : "tool";
+    return `**Tool result - \`${toolName}\`**\n\n\`\`\`json\n${stringifyUnknown(partRecord.result)}\n\`\`\``;
+  }
+
+  return stringifyUnknown(partRecord);
+};
+
+const toMarkdownContent = (content: ChatMessage["content"]): string => {
+  const normalized = toMarkdownPart(content)
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trimEnd();
+
+  return normalized;
 };
 
 // Icon components for better organization
@@ -90,7 +199,7 @@ const CopyButton = ({ text }: { text: string }) => {
   return (
     <button
       onClick={handleCopy}
-      className="absolute top-3 right-3 px-2 py-1 text-xs bg-black/40 hover:bg-black/60 text-gray-300 hover:text-white rounded transition-all duration-200 opacity-0 group-hover:opacity-100"
+      className="absolute top-6 right-3 px-2 py-1 text-xs bg-black/40 hover:bg-black/60 text-gray-300 hover:text-white rounded transition-all duration-200 opacity-0 group-hover:opacity-100"
       title="Copy code"
     >
       {copied ? "✓" : "📋"}
@@ -155,6 +264,8 @@ const TableHeaderCell = ({ children, ...props }: any) => (
 
 // Enhanced markdown options with custom components
 const MARKDOWN_OPTIONS = {
+  forceBlock: true,
+  disableParsingRawHTML: true,
   overrides: {
     h1: {
       component: ({ children, ...props }: any) => (
@@ -230,10 +341,12 @@ const MARKDOWN_OPTIONS = {
     ul: {
       component: ({ children, ...props }: any) => {
         // Check if it's a task list by looking for checkbox inputs in children
-        const hasCheckboxes = children?.some?.((child: any) =>
-          child?.props?.children?.some?.(
-            (c: any) => c?.type === "input" && c?.props?.type === "checkbox"
-          )
+        const listItems = Children.toArray(children);
+        const hasCheckboxes = listItems.some((child: any) =>
+          Children.toArray(child?.props?.children).some(
+            (item: any) =>
+              item?.type === "input" && item?.props?.type === "checkbox",
+          ),
         );
 
         return (
@@ -257,13 +370,13 @@ const MARKDOWN_OPTIONS = {
     },
     li: {
       component: ({ children, ...props }: any) => {
+        const normalizedChildren = Children.toArray(children);
+
         // Check if this is a task list item
-        const hasCheckbox =
-          Array.isArray(children) &&
-          children.some(
-            (child: any) =>
-              child?.type === "input" && child?.props?.type === "checkbox"
-          );
+        const hasCheckbox = normalizedChildren.some(
+          (child: any) =>
+            child?.type === "input" && child?.props?.type === "checkbox",
+        );
 
         if (hasCheckbox) {
           return (
@@ -271,7 +384,7 @@ const MARKDOWN_OPTIONS = {
               className="flex items-start gap-2 leading-7 text-gray-200 list-none"
               {...props}
             >
-              {children}
+              {normalizedChildren}
             </li>
           );
         }
@@ -281,7 +394,7 @@ const MARKDOWN_OPTIONS = {
             className="leading-7 text-gray-200 marker:text-orange-400 marker:text-lg ml-6"
             {...props}
           >
-            <span className="pl-2">{children}</span>
+            <span className="pl-2">{normalizedChildren}</span>
           </li>
         );
       },
@@ -330,33 +443,40 @@ const MARKDOWN_OPTIONS = {
     },
     code: {
       component: ({ children, className, ...props }: any) => {
-        const isInline = !className?.includes("language-");
-        const language = className?.replace("language-", "");
-        return isInline ? (
-          <code
-            className="bg-linear-to-r from-orange-500/20 to-amber-500/20 px-2 py-0.5 rounded-md text-sm font-mono text-orange-300 border border-orange-500/30 hover:border-orange-400/50 transition-all duration-200 shadow-sm"
-            {...props}
-          >
-            {children}
-          </code>
-        ) : (
-          <code
-            className="text-sm font-mono leading-relaxed block text-gray-200"
-            data-language={language}
-            {...props}
-          >
-            {children}
-          </code>
-        );
+        const language = getLanguageFromClassName(className);
+        const isInline = !language;
+        return isInline ?
+            <code
+              className="bg-linear-to-r from-orange-500/20 to-amber-500/20 px-2 py-0.5 rounded-md text-sm font-mono text-orange-300 border border-orange-500/30 hover:border-orange-400/50 transition-all duration-200 shadow-sm"
+              {...props}
+            >
+              {children}
+            </code>
+          : <code
+              className="text-sm font-mono leading-relaxed block text-gray-200"
+              data-language={language || undefined}
+              {...props}
+            >
+              {children}
+            </code>;
       },
     },
     pre: {
       component: ({ children, ...props }: any) => {
-        const codeContent = children?.props?.children || "";
+        const codeLanguage = getLanguageFromClassName(
+          children?.props?.className,
+        );
+        const codeContent = toCodeText(children?.props?.children);
+
         return (
           <div className="relative group my-6">
+            {codeLanguage && (
+              <span className="absolute right-3 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide rounded bg-white/10 text-orange-200 border border-white/15 z-10">
+                {codeLanguage}
+              </span>
+            )}
             <pre
-              className="bg-linear-to-br from-black/80 to-black/60 p-5 pt-6 rounded-xl overflow-x-auto border border-white/10 hover:border-orange-500/30 transition-all duration-300 shadow-xl backdrop-blur-sm"
+              className="bg-linear-to-br from-black/80 to-black/60 p-5 pt-10 rounded-xl overflow-x-auto border border-white/10 hover:border-orange-500/30 transition-all duration-300 shadow-xl backdrop-blur-sm"
               {...props}
             >
               {children}
@@ -527,6 +647,15 @@ export function MessageBubble({ message, error }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const avatarStyles = getAvatarStyles(message.role, !!error);
   const bubbleStyles = getBubbleStyles(message.role, !!error);
+  const bubbleRadiusStyles = getBubbleRadiusStyles(message.role);
+  const markdownContent = useMemo(
+    () => toMarkdownContent(message.content),
+    [message.content],
+  );
+  const roleLabel =
+    isUser ? "You"
+    : error ? "System"
+    : "Assistant";
 
   const renderAvatarIcon = () => {
     if (isUser) return <UserIcon />;
@@ -539,7 +668,11 @@ export function MessageBubble({ message, error }: MessageBubbleProps) {
         isUser ? "justify-end" : "justify-start"
       }`}
     >
-      <div className="flex gap-3 max-w-3xl">
+      <div
+        className={`flex gap-3 max-w-[min(90%,52rem)] ${
+          isUser ? "flex-row-reverse" : ""
+        }`}
+      >
         {/* Avatar */}
         <div
           className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${avatarStyles} shadow-lg transition-all duration-200 group-hover:shadow-xl`}
@@ -549,11 +682,18 @@ export function MessageBubble({ message, error }: MessageBubbleProps) {
 
         {/* Message Bubble */}
         <div
-          className={`px-5 py-4 rounded-2xl ${bubbleStyles} shadow-lg transition-all duration-200 hover:shadow-xl border`}
+          className={`px-5 py-4 ${bubbleRadiusStyles} ${bubbleStyles} shadow-lg transition-all duration-200 hover:shadow-xl`}
         >
-          <div className="prose prose-invert max-w-none">
+          <div
+            className={`text-[11px] uppercase tracking-wider font-semibold mb-2 ${
+              isUser ? "text-cyan-100/80 text-right" : "text-orange-200/70"
+            }`}
+          >
+            {roleLabel}
+          </div>
+          <div className="max-w-none wrap-break-word">
             <MarkDownToJSX options={MARKDOWN_OPTIONS}>
-              {message.content.toString()}
+              {markdownContent || "_No content_"}
             </MarkDownToJSX>
           </div>
         </div>

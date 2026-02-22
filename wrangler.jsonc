@@ -2,21 +2,23 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "workers-ai-chat",
   "main": "worker/index.ts",
-  "compatibility_date": "2025-10-11",
+  "compatibility_date": "2026-02-19",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
-    "enabled": true
+    "enabled": true,
   },
+  "workers_dev": false,
+  "preview_urls": false,
   "ai": {
-    "binding": "AI"
+    "binding": "AI",
   },
   "durable_objects": {
     "bindings": [
       {
         "name": "ChatAgent",
-        "class_name": "ChatAgent"
-      }
-    ]
+        "class_name": "ChatAgent",
+      },
+    ],
   },
   "vars": {
     // "TEAM_DOMAIN": "my-team-DOMAIN", // eg: https://my-team-name.cloudflareaccess.com ADD this to secret
@@ -25,7 +27,7 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["ChatAgent"]
-    }
-  ]
+      "new_sqlite_classes": ["ChatAgent"],
+    },
+  ],
 }

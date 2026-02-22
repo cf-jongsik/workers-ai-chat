@@ -21,19 +21,19 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     cookie["CF_Authorization"] ||
     request.headers.get("Cf-Access-Jwt-Assertion");
   const { ChatAgent, TEAM_DOMAIN, POLICY_AUD } = context.cloudflare.env;
-  console.log({
-    token: token?.slice(0, 15) + "...",
-    TEAM_DOMAIN: TEAM_DOMAIN.slice(0, 15) + "...",
-    POLICY_AUD: POLICY_AUD.slice(0, 15) + "...",
-  });
 
   try {
     if (!token || !TEAM_DOMAIN || !POLICY_AUD) {
       throw new Error("Missing token or TEAM_DOMAIN or POLICY_AUD");
     }
+    console.log({
+      token: token?.slice(0, 15) + "...",
+      TEAM_DOMAIN: TEAM_DOMAIN.slice(0, 15) + "...",
+      POLICY_AUD: POLICY_AUD.slice(0, 15) + "...",
+    });
 
     const JWKS = createRemoteJWKSet(
-      new URL(`${TEAM_DOMAIN}/cdn-cgi/access/certs`)
+      new URL(`${TEAM_DOMAIN}/cdn-cgi/access/certs`),
     );
 
     // Verify the JWT

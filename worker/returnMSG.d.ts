@@ -26,34 +26,45 @@ type returnMSG = {
   user: null;
 };
 
-type OUTPUT =
-  | {
-      id: string;
-      content: [
-        {
-          text: string;
-          type: "reasoning_text";
-        }
-      ];
-      summary: [];
-      type: "reasoning";
-      encrypted_content: null;
-      status: null;
-    }
-  | {
-      id: string;
-      content: [
-        {
-          annotations: [];
-          text: string;
-          type: "output_text";
-          logprobs: null;
-        }
-      ];
-      role: "assistant";
-      status: "completed";
-      type: "message";
-    };
+type OUTPUT = REASONING | MESSAGE | FUNCTION_CALL_FETCH;
+
+type MESSAGE = {
+  id: string;
+  content: [
+    {
+      annotations: [];
+      text: string;
+      type: "output_text";
+      logprobs: null;
+    },
+  ];
+  role: "assistant";
+  status: "completed";
+  type: "message";
+};
+
+type REASONING = {
+  id: string;
+  content: [
+    {
+      text: string;
+      type: "reasoning_text";
+    },
+  ];
+  summary: [];
+  type: "reasoning";
+  encrypted_content: null;
+  status: null;
+};
+
+type FUNCTION_CALL_FETCH = {
+  arguments: string;
+  call_id: string;
+  name: "fetch";
+  type: "function_call";
+  id: string;
+  status: null;
+};
 
 type USAGE = {
   prompt_tokens: number;

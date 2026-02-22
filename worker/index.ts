@@ -1,5 +1,10 @@
-import { prompt } from "./prompt";
+import {
+  contentExtractorPrompt,
+  conversationPrompt,
+  summarizePrompt,
+} from "./prompt";
 import { createRequestHandler } from "react-router";
+import { NodeHtmlMarkdown } from "node-html-markdown";
 import {
   Agent,
   type Connection,
@@ -20,7 +25,7 @@ declare module "react-router" {
 
 const requestHandler = createRequestHandler(
   () => import("virtual:react-router/server-build"),
-  import.meta.env.MODE
+  import.meta.env.MODE,
 );
 
 export default {
@@ -66,7 +71,7 @@ export class ChatAgent extends Agent<Env, chatAgentState> {
 
   onConnect(connection: Connection, ctx: ConnectionContext): void {
     console.log(
-      `New connection established. Sending ${this.state.messages.length} existing messages.`
+      `New connection established. Sending ${this.state.messages.length} existing messages.`,
     );
     if (this.state.messages.length > 0) {
       this.state.messages.forEach((msg) => {
@@ -74,7 +79,7 @@ export class ChatAgent extends Agent<Env, chatAgentState> {
       });
     } else {
       const welcomeMessage = createAssistantMessage(
-        "Hello! I'm an AI assistant. Ask me anything!"
+        "Hello! I'm an AI assistant. Ask me anything!",
       );
       connection.send(JSON.stringify(welcomeMessage));
     }
@@ -113,14 +118,14 @@ export class ChatAgent extends Agent<Env, chatAgentState> {
       ) {
         console.error("Invalid message structure:", userMessage);
         const errorMsg = createErrorMessage(
-          "Invalid message: must have role 'user' and content"
+          "Invalid message: must have role 'user' and content",
         );
         connection.send(JSON.stringify(errorMsg));
         return;
       }
 
       console.log(
-        `Processing user message: ${userMessage.content.slice(0, 50)}...`
+        `Processing user message: ${userMessage.content.slice(0, 50)}...`,
       );
 
       // Update state with user message
@@ -137,14 +142,25 @@ export class ChatAgent extends Agent<Env, chatAgentState> {
       try {
         console.log("Calling AI service...");
         response = (await AI.run("@cf/openai/gpt-oss-120b", {
-          instructions: prompt,
+          instructions: conversationPrompt,
           input: conversationHistory,
+          tools: [
+            {
+              name: "fetch",
+              description: "Fetch data from the web",
+              type: "function",
+              parameters: { url: "url to fetch data from" },
+              strict: true,
+            },
+          ],
+          max_tokens: 6000,
+          reasoning_effort: "low",
         })) as unknown as returnMSG;
         console.log("AI service responded successfully");
       } catch (aiError) {
         console.error("AI service error:", aiError);
         const errorMsg = createErrorMessage(
-          "Failed to process your request. Please try again."
+          "Failed to process your request. Please try again.",
         );
         connection.send(JSON.stringify(errorMsg));
         return;
@@ -154,16 +170,15 @@ export class ChatAgent extends Agent<Env, chatAgentState> {
       if (!response || !response.output || !Array.isArray(response.output)) {
         console.error("Invalid AI response structure:", response);
         const errorMsg = createErrorMessage(
-          "Received invalid response from AI service"
+          "Received invalid response from AI service",
         );
         connection.send(JSON.stringify(errorMsg));
         return;
       }
 
       console.log(
-        `Processing ${response.output.length} output items from AI response`
+        `Processing ${response.output.length} output items from AI response`,
       );
-
       // Process AI response messages
       const assistantMessages: ModelMessage[] = [];
 
@@ -182,9 +197,116 @@ export class ChatAgent extends Agent<Env, chatAgentState> {
             const assistantMessage = createAssistantMessage(content);
             assistantMessages.push(assistantMessage);
             console.log(
-              `Sending assistant message: ${content.slice(0, 50)}...`
+              `Sending assistant message: ${content.slice(0, 50)}...`,
             );
             connection.send(JSON.stringify(assistantMessage));
+          }
+        }
+        if (output.type === "function_call") {
+          const functionCall = output as FUNCTION_CALL_FETCH;
+          const { url }: { url: string } = JSON.parse(functionCall.arguments);
+          if (!url) {
+            console.error("Invalid function call arguments");
+            const errorMsg = createErrorMessage(
+              "Invalid function call arguments\nfunction: " +
+                functionCall.name +
+                "\nurl: " +
+                (url || ""),
+            );
+            connection.send(JSON.stringify(errorMsg));
+            return;
+          }
+          const functionCallMsg = createAssistantMessage(
+            `function calling:\n${functionCall.name}=> url: ${url}`,
+          );
+          assistantMessages.push(functionCallMsg);
+          connection.send(JSON.stringify(functionCallMsg));
+          const function_call_response = await fetch(url);
+          if (!function_call_response.ok) {
+            console.error("Failed to fetch url", url);
+            const errorMsg = createErrorMessage(
+              "Failed to fetch url\nfunction: " +
+                functionCall.name +
+                "\nurl: " +
+                (url || ""),
+            );
+            connection.send(JSON.stringify(errorMsg));
+            return;
+          }
+          const function_call_response_text =
+            await function_call_response.text();
+
+          const markdown = NodeHtmlMarkdown.translate(
+            function_call_response_text.trim(),
+          );
+          const markdownMsg = createAssistantMessage(
+            `Got the markdown. Please wait... Now processing...`,
+          );
+          assistantMessages.push(markdownMsg);
+          connection.send(JSON.stringify(markdownMsg));
+          const aiGetBodyResponse = await AI.run(
+            "@cf/meta/llama-3.1-8b-instruct-fast",
+            {
+              messages: [
+                {
+                  role: "system",
+                  content: `${contentExtractorPrompt}`,
+                },
+                {
+                  role: "user",
+                  content: `${markdown}`,
+                },
+              ],
+              max_tokens: 10000,
+            },
+          );
+          console.log(aiGetBodyResponse.usage);
+          if (!aiGetBodyResponse || !aiGetBodyResponse.response) {
+            console.error(
+              "could not get body of markdown",
+              markdown.slice(0, 50),
+            );
+            const errorMsg = createErrorMessage(
+              "Failed to get body of markdown:\n" + markdown.slice(0, 50),
+            );
+            connection.send(JSON.stringify(errorMsg));
+            return;
+          }
+          const content = createAssistantMessage(aiGetBodyResponse.response);
+          assistantMessages.push(content);
+          console.log(
+            `Sending assistant message: ${aiGetBodyResponse.response.slice(0, 50)}...`,
+          );
+          connection.send(JSON.stringify(content));
+          const summaryMsg = createAssistantMessage(
+            `Now summarizing. Please wait...`,
+          );
+          assistantMessages.push(summaryMsg);
+          connection.send(JSON.stringify(summaryMsg));
+          const aiSummaryResponse = await AI.run(
+            "@cf/meta/llama-3.1-8b-instruct-fast",
+            {
+              messages: [
+                {
+                  role: "system",
+                  content: summarizePrompt,
+                },
+                {
+                  role: "user",
+                  content: aiGetBodyResponse.response,
+                },
+              ],
+              max_tokens: 6000,
+            },
+          );
+          console.log(aiSummaryResponse.usage);
+          if (aiSummaryResponse && aiSummaryResponse.response) {
+            const content = createAssistantMessage(aiSummaryResponse.response);
+            assistantMessages.push(content);
+            console.log(
+              `Sending assistant message: ${aiSummaryResponse.response.slice(0, 50)}...`,
+            );
+            connection.send(JSON.stringify(content));
           }
         }
       }
@@ -201,7 +323,7 @@ export class ChatAgent extends Agent<Env, chatAgentState> {
     } catch (error) {
       console.error("Unexpected error in onMessage:", error);
       const errorMsg = createErrorMessage(
-        "An unexpected error occurred. Please try again."
+        "An unexpected error occurred. Please try again.",
       );
       connection.send(JSON.stringify(errorMsg));
     }
