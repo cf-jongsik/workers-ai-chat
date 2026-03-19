@@ -2,7 +2,6 @@ import type { Route } from "./+types/home";
 import { ChatPage } from "../components";
 import { routeAgentRequest } from "agents";
 import { jwtVerify, createRemoteJWKSet } from "jose";
-import { parse } from "cookie";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -42,7 +41,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     return { agentName: "ChatAgent", roomId: id.toString() };
   } catch (e) {
     console.error(e);
-    const id = ChatAgent.newUniqueId();
+    //    const id = ChatAgent.newUniqueId();
+    const id = ChatAgent.idFromName("anonymous");
     return { agentName: "ChatAgent", roomId: id.toString() };
   }
 }

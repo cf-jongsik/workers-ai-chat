@@ -53,16 +53,15 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
         timestamp: welcomeMessage.timestamp,
       };
       connection.send(JSON.stringify(chunk));
-
-      // Send done to complete the welcome message
-      connection.send(
-        JSON.stringify({
-          type: "done",
-          data: null,
-          timestamp: Date.now(),
-        }),
-      );
     }
+    // Send done to complete the welcome message
+    connection.send(
+      JSON.stringify({
+        type: "done",
+        data: null,
+        timestamp: Date.now(),
+      }),
+    );
   }
 
   async onMessage(connection: Connection, message: WSMessage): Promise<void> {

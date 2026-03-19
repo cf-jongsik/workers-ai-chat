@@ -157,9 +157,7 @@ export function ChatPage({ agentName, roomId }: ChatPageProps) {
               result: unknown;
               error?: string;
             };
-            console.log("result", result);
             const existing = pendingToolResults.current.get(result.toolCallId);
-            console.log("existing", existing);
             if (existing) {
               existing.result = result.result;
               existing.error = result.error;
@@ -275,6 +273,12 @@ export function ChatPage({ agentName, roomId }: ChatPageProps) {
   useEffect(() => {
     // The useAgent hook connects automatically
   }, [agent]);
+
+  // Reset loading states on mount to fix UI lock after refresh
+  useEffect(() => {
+    setIsLoading(false);
+    setIsStreaming(false);
+  }, []);
 
   return (
     <div className="flex flex-col h-screen bg-linear-to-br from-black via-slate-950 to-black">
