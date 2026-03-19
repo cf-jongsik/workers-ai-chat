@@ -7,11 +7,14 @@ A modern, real-time chat application powered by Cloudflare Workers AI and Durabl
 ## Features
 
 - **Real-time Chat**: WebSocket-powered communication with instant message delivery
-- **AI-Powered**: Integrated with Cloudflare Workers AI using the `@cf/openai/gpt-oss-120b` model
+- **AI-Powered**: Integrated with Cloudflare Workers AI using the nemotron-3-120b-a12b model
 - **Persistent Conversations**: Chat history stored in Durable Objects for continuity across sessions
 - **Modern UI**: Beautiful, responsive interface with Tailwind CSS and smooth animations
 - **Accessibility**: Full ARIA support and keyboard navigation
-- **Error Handling**: Comprehensive error handling with user-friendly feedback
+- **Streaming Responses**: Real-time AI response streaming for better UX
+- **Tool Support**: Extensible tool registry for AI capabilities
+- **State Management**: Zustand stores for efficient UI state handling
+- **Custom Hooks**: Reusable streaming and chat logic
 - **Authentication**: Optional Cloudflare Access integration for secure access
 - **Rich Markdown**: Support for code blocks, tables, links, and formatted text
 
@@ -19,14 +22,14 @@ A modern, real-time chat application powered by Cloudflare Workers AI and Durabl
 
 - **Frontend**: React Router v7, TypeScript, Tailwind CSS
 - **Backend**: Cloudflare Workers, Durable Objects
-- **AI**: Cloudflare Workers AI (`@cf/openai/gpt-oss-120b`)
+- **AI**: Cloudflare Workers AI (nemotron-3-120b-a12b via AI SDK)
 - **Real-time**: WebSocket connections via Agents framework
 - **Markdown**: Rich message rendering with `markdown-to-jsx`
 - **Build Tools**: Vite, React Router Dev
 
 ## Prerequisites
 
-- Node.js 18+ and pnpm
+- Node.js 18+ and Bun
 - Cloudflare account with Workers enabled
 - Workers AI enabled on your account (no API key required when using the `AI` binding)
 
@@ -42,7 +45,7 @@ A modern, real-time chat application powered by Cloudflare Workers AI and Durabl
 2. Install dependencies:
 
    ```bash
-   pnpm install
+   bun install
    ```
 
 3. Login to Cloudflare (once per machine):
@@ -61,24 +64,24 @@ A modern, real-time chat application powered by Cloudflare Workers AI and Durabl
 5. Set up Wrangler secrets (required for production):
 
    ```bash
-   pnpm wrangler secret add TEAM_DOMAIN
+   bun wrangler secret add TEAM_DOMAIN
    # Enter your Cloudflare Access team domain (e.g., https://my-team.cloudflareaccess.com)
 
-   pnpm wrangler secret add POLICY_AUD
+   bun wrangler secret add POLICY_AUD
    # Enter your Cloudflare Access policy AUD tag
    ```
 
 6. Start the development server:
 
    ```bash
-   pnpm dev
+   bun dev
    ```
 
 7. Open your browser and navigate to `http://localhost:5173`
 
 8. Deploy to production:
    ```bash
-   pnpm deploy
+   bun run deploy
    ```
 
 ## Configuration
@@ -95,10 +98,10 @@ For development, you can configure the following in your `.dev.vars`:
 For production deployment, you must set up the following secrets:
 
 ```bash
-pnpm wrangler secret add TEAM_DOMAIN
+bun wrangler secret add TEAM_DOMAIN
 # Enter your Cloudflare Access team domain (e.g., https://my-team.cloudflareaccess.com)
 
-pnpm wrangler secret add POLICY_AUD
+bun wrangler secret add POLICY_AUD
 # Enter your Cloudflare Access policy AUD tag
 ```
 
@@ -106,7 +109,7 @@ pnpm wrangler secret add POLICY_AUD
 
 ### Wrangler Configuration
 
-The application uses Cloudflare Durable Objects for chat state management. The configuration is defined in `wrangler.jsonc`:
+The application uses Cloudflare Durable Objects for chat state management. Copy `wrangler.jsonc.example` to `wrangler.jsonc` and configure:
 
 - **AI Binding**: Enables Workers AI integration
 - **Durable Objects**: Persists chat state across sessions
@@ -122,25 +125,30 @@ The application uses Cloudflare Durable Objects for chat state management. The c
 - Handles loading states, errors, and connection status
 - Provides auto-resizing textarea and keyboard shortcuts
 
-### Worker (`worker/index.ts`)
+### Worker (`worker/agents/ChatAgent.ts`)
 
-- Routes WebSocket connections to the ChatAgent Durable Object
-- Handles message persistence and state management
-- Calls Workers AI with conversation history:
-  ```ts
-  const response = await AI.run("@cf/openai/gpt-oss-120b", {
-    instructions: prompt,
-    input: JSON.stringify(messages),
-  });
-  ```
-- Processes AI responses and broadcasts to connected clients
+- Routes WebSocket connections via the Agents framework
+- Manages AI conversations using the AI SDK with nemotron-3-120b-a12b
+- Processes streaming AI responses for real-time message display
+- Handles message persistence and state management in Durable Objects
 - Implements comprehensive error handling and validation
+- Supports tool calling through the tools registry (`worker/tools/`)
 
-### Authentication (`app/routes/home.tsx`)
+### useStreaming Hook (`app/hooks/useStreaming.ts`)
 
-- Optional Cloudflare Access JWT verification
-- Creates unique Durable Object instances per user
-- Falls back to anonymous sessions if authentication is disabled
+Custom hook for handling streaming AI responses:
+
+- Processes Server-Sent Events (SSE) from the AI service
+- Manages streaming state (streaming, completed, error)
+- Provides real-time message updates during AI generation
+- Handles stream errors gracefully
+
+### State Management
+
+Uses Zustand for efficient state management:
+
+- **chatStore** (`app/stores/chatStore.ts`): Manages chat messages, loading states, and error handling
+- **uiStore** (`app/stores/uiStore.ts`): Handles UI state like connection status
 
 ## Project Structure
 
@@ -149,32 +157,53 @@ workers-ai-chat/
 ├── app/                    # React Router application
 │   ├── components/         # React components
 │   │   ├── ChatPage.tsx    # Main chat interface
-│   │   └── MessageBubble.tsx # Message rendering component
-│   ├── routes/             # Route components
-│   │   ├── home.tsx        # Home page with authentication
-│   │   └── jwt.d.ts        # JWT type definitions
-│   ├── root.tsx            # Root layout
-│   ├── app.css             # Global styles
-│   └── routes.ts           # Route configuration
-├── worker/                 # Cloudflare Worker
-│   ├── index.ts            # Main worker entry point
-│   └── prompt.ts           # AI system prompt
-├── public/                 # Static assets
-├── package.json            # Dependencies and scripts
-├── wrangler.jsonc          # Cloudflare Workers configuration
-├── vite.config.ts          # Vite build configuration
-└── tsconfig*.json          # TypeScript configurations
+│   │   ├── messages/       # Message components
+│   │   │   └── MessageBubble.tsx
+│   │   ├── chat/          # Chat-related components
+│   │   └── index.ts
+│   ├── hooks/             # Custom React hooks
+│   │   ├── useStreaming.ts
+│   │   └── index.ts
+│   ├── routes/            # Route components
+│   │   ├── home.tsx       # Home page with authentication
+│   │   └── jwt.d.ts
+│   ├── stores/            # Zustand state stores
+│   │   ├── chatStore.ts
+│   │   ├── uiStore.ts
+│   │   └── index.ts
+│   ├── root.tsx           # Root layout
+│   ├── app.css            # Global styles
+│   └── routes.ts          # Route configuration
+├── worker/                # Cloudflare Worker
+│   ├── agents/            # Durable Object agents
+│   │   ├── ChatAgent.ts   # Main chat agent
+│   │   └── prompts.ts     # AI system prompts
+│   ├── lib/               # Utility libraries
+│   │   └── streamDecoder.ts
+│   ├── streaming/         # Streaming response processor
+│   │   └── processor.ts
+│   ├── tools/             # AI tool registry
+│   │   ├── built-in.ts
+│   │   ├── index.ts
+│   │   └── registry.ts
+│   ├── index.ts           # Main worker entry point
+│   └── types.ts           # Shared type definitions
+├── public/                # Static assets
+├── package.json           # Dependencies and scripts
+├── wrangler.jsonc.example # Cloudflare Workers config template
+├── vite.config.ts         # Vite build configuration
+└── tsconfig*.json         # TypeScript configurations
 ```
 
 ## Available Scripts
 
-- `pnpm dev` - Start development server
-- `pnpm build` - Build for production
-- `pnpm deploy` - Build and deploy to Cloudflare Workers
-- `pnpm typecheck` - Run TypeScript type checking
-- `pnpm lint` - Run ESLint
-- `pnpm preview` - Preview production build locally
-- `pnpm cf-typegen` - Generate Cloudflare Worker types
+- `bun dev` - Start development server
+- `bun run build` - Build for production
+- `bun run deploy` - Build and deploy to Cloudflare Workers
+- `bun run typecheck` - Run TypeScript type checking
+- `bun run lint` - Run ESLint
+- `bun run preview` - Preview production build locally
+- `bun run cf-typegen` - Generate Cloudflare Worker types
 
 ## Key Components
 
@@ -238,8 +267,8 @@ Renders individual messages with:
 
 ### Testing
 
-- Run `pnpm typecheck` to verify TypeScript types
-- Use `pnpm lint` for code quality checks
+- Run `bun run typecheck` to verify TypeScript types
+- Use `bun run lint` for code quality checks
 - Test WebSocket functionality in development mode
 
 ## Deployment
@@ -253,7 +282,7 @@ The application deploys as a single Cloudflare Worker with:
 
 ## Notes
 
-- The Worker uses `@cf/openai/gpt-oss-120b` by default. You can swap to other Workers AI text models; see Cloudflare docs for available models.
+- The Worker uses nemotron-3-120b-a12b via the AI SDK for optimal performance
 - Chat history is persisted per user in Durable Objects
 - Authentication is optional - the app works in anonymous mode
 - All AI processing happens on Cloudflare's edge network
