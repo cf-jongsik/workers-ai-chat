@@ -77,7 +77,13 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
         streamingProcessor.sendError("AI service is not available");
         return;
       }
-
+      if (message.toString() === "clear_history") {
+        this.setState({
+          messages: [],
+          lastUpdate: new Date(),
+        });
+        return;
+      }
       // Parse and validate incoming message
       let userMessage: ChatMessage;
       try {

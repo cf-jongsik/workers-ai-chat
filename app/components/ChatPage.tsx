@@ -266,6 +266,7 @@ export function ChatPage({ agentName, roomId }: ChatPageProps) {
   // Clear chat history
   const handleClearHistory = useCallback(() => {
     clearMessages();
+    agent.send("clear_history");
     // Note: Agent state clearing should be handled server-side
   }, [clearMessages]);
 
