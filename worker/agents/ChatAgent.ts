@@ -71,7 +71,7 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
 
     try {
       // Validate AI service availability
-      const { AI } = this.env;
+      const { AI, GATEWAY_ID } = this.env;
       if (!AI) {
         console.error(`[${requestId}] AI service not available`);
         streamingProcessor.sendError("AI service is not available");
@@ -124,18 +124,26 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
 
       // Call AI service with streaming
       try {
-        // @ts-ignore - AI streaming API
-        const stream = await AI.run("@cf/nvidia/nemotron-3-120b-a12b", {
-          messages: [
-            { role: "system", content: prompts },
-            ...conversationHistory,
-          ],
-          max_tokens: 20000,
-          reasoning_effort: "high",
-          stream: true,
-          tools: tools.length > 0 ? tools : undefined,
-          tool_choice: tools.length > 0 ? "auto" : undefined,
-        });
+        const stream = await AI.run(
+          // @ts-ignore - AI streaming API
+          "@cf/nvidia/nemotron-3-120b-a12b",
+          {
+            messages: [
+              { role: "system", content: prompts },
+              ...conversationHistory,
+            ],
+            max_tokens: 20000,
+            reasoning_effort: "high",
+            stream: true,
+            tools: tools.length > 0 ? tools : undefined,
+            tool_choice: tools.length > 0 ? "auto" : undefined,
+          },
+          {
+            gateway: {
+              id: GATEWAY_ID,
+            },
+          },
+        );
 
         // Process the stream using SSE decoder
         let fullContent = "";
@@ -317,8 +325,12 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
                   ...followUpHistory,
                 ],
                 max_tokens: 20000,
-                reasoning_effort: "high",
                 stream: true,
+              },
+              {
+                gateway: {
+                  id: GATEWAY_ID,
+                },
               },
             );
 
