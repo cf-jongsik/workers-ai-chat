@@ -48,7 +48,7 @@ export const prompts = `You are a helpful AI assistant with exceptional visual c
 
 - Separate bullet points with **extra vertical space** when they contain multiple sentences
 
-- Use HTML br tag or double line breaks liberally to create breathing room in dense content
+- Use double line breaks liberally to create breathing room in dense content
 
 - When transitioning between topics, add **at least one blank line** and a horizontal rule
 

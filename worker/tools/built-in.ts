@@ -1,70 +1,106 @@
 import { toolRegistry } from "./registry";
 import type { ToolDefinition } from "../types";
+import { env } from "cloudflare:workers";
 
-const fetchTool: ToolDefinition = {
-  name: "fetch",
-  description:
-    "Fetch data from a URL. Supports HTTP GET requests to retrieve web content.",
+const browserTool: ToolDefinition = {
+  name: "browser",
+  description: "Open a webpage in a browser and return the content.",
   parameters: {
     type: "object",
     properties: {
       url: {
         type: "string",
-        description: "The URL to fetch data from",
+        description: "The URL to open (e.g., https://example.com)",
       },
-      headers: {
-        type: "object",
-        description: "Optional headers to include in the request",
+      instruction: {
+        type: "string",
+        description: `Instruction for the browser fetching agent to extract data from the webpage.
+        It must specify the 'action' (e.g., 'extract_text', 'find_links', 'get_price', 'get_release_date'),
+        and a 'keywords' array of text to focus on. (e.g., ["price", "discount", "release date", "availability"])`,
       },
     },
-    required: ["url"],
+    required: ["url", "instruction"],
   },
   execute: async (args) => {
-    const { url, headers = {} } = args as {
+    const { url, instruction } = args as {
       url: string;
-      headers?: Record<string, string>;
+      instruction: string;
     };
 
+    if (!url || !instruction) {
+      return {
+        success: false,
+        error: "Missing required parameters",
+      };
+    }
+    console.log("browserTool", { url, instruction });
+    const browserWSEndpoint = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/browser-rendering/json`;
+
     try {
-      const response = await fetch(url, {
-        method: "GET",
+      const result = await fetch(browserWSEndpoint, {
+        method: "POST",
         headers: {
-          accept:
-            "text/markdown;q=1.0, text/html;q=0.7, text/json;q=0.9, text/plain;q=0.8, application/json;q=0.9, application/xhtml+xml;q=0.7, application/xml;q=0.9",
-          "User-Agent": "Workers-AI-Chat/1.0",
-          ...headers,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
         },
+        body: JSON.stringify({
+          url,
+          prompt: instruction,
+          response_format: {
+            type: "json_schema",
+            schema: {
+              type: "object",
+              properties: {
+                url: {
+                  type: "string",
+                },
+                action: {
+                  type: "string",
+                },
+                keywords: {
+                  type: "array",
+                  items: {
+                    type: "string",
+                  },
+                },
+                data: {
+                  type: "array",
+                  items: {
+                    type: "string",
+                  },
+                },
+              },
+            },
+          },
+        }),
       });
 
-      if (!response.ok) {
+      console.log("browserTool result", result);
+
+      if (!result.ok) {
+        console.error("Browser tool error:", result);
         return {
           success: false,
-          error: `HTTP ${response.status}: ${response.statusText}`,
+          error: "Failed to fetch data from browser rendering API",
         };
       }
 
-      const contentType = response.headers.get("content-type") || "";
-      let data: unknown;
+      const resultJson = (await result.json()) as {
+        success: boolean;
+        result: object;
+      };
 
-      if (contentType.includes("application/json")) {
-        data = await response.json();
-      } else {
-        data = await response.text();
-      }
+      console.log("browserTool result", resultJson.result);
 
       return {
-        success: true,
-        data: {
-          status: response.status,
-          statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
-          body: data,
-        },
+        success: resultJson.success,
+        data: resultJson.result,
       };
     } catch (error) {
+      console.error("Browser tool error:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : "Unknown error",
       };
     }
   },
@@ -156,9 +192,8 @@ const datetimeTool: ToolDefinition = {
       const now = new Date();
       let result: string | number;
 
-      const options: Intl.DateTimeFormatOptions = timezone
-        ? { timeZone: timezone }
-        : {};
+      const options: Intl.DateTimeFormatOptions =
+        timezone ? { timeZone: timezone } : {};
 
       switch (format) {
         case "iso":
@@ -200,9 +235,9 @@ const datetimeTool: ToolDefinition = {
 
 // Register all built-in tools
 export function registerBuiltInTools(): void {
-  toolRegistry.register(fetchTool);
   toolRegistry.register(calculatorTool);
   toolRegistry.register(datetimeTool);
+  toolRegistry.register(browserTool);
 }
 
-export { fetchTool, calculatorTool, datetimeTool };
+export { calculatorTool, datetimeTool, browserTool };

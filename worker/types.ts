@@ -77,6 +77,11 @@ export interface JSONSchemaProperty {
 }
 
 // Streaming types
+export interface ContentWithRole {
+  content: string;
+  role: "user" | "assistant";
+}
+
 export interface StreamChunk {
   type:
     | "content"

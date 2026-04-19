@@ -2,7 +2,7 @@ import { useEffect, useCallback, useRef, useState } from "react";
 import { useAgent } from "agents/react";
 import { useChatStore, useUIStore } from "../stores";
 import { MessageBubble } from "./messages";
-import type { ChatMessage, StreamChunk } from "../types";
+import type { ChatMessage, StreamChunk, ContentWithRole } from "../types";
 
 interface ChatPageProps {
   agentName: string;
@@ -50,8 +50,6 @@ export function ChatPage({ agentName, roomId }: ChatPageProps) {
       }
     >
   >(new Map());
-  const hasAutoSentResults = useRef(false);
-
   // Auto-scroll to bottom only when new messages added (not during streaming)
   const prevMessagesLength = useRef(messages.length);
 
@@ -118,13 +116,36 @@ export function ChatPage({ agentName, roomId }: ChatPageProps) {
         const chunk = JSON.parse(message.data) as StreamChunk;
         switch (chunk.type) {
           case "content": {
-            // Auto-start streaming if receiving content while not streaming
-            // (happens with server-side follow-up after tool execution)
-            if (!isStreaming) {
-              setIsStreaming(true);
-              setIsLoading(true);
+            // Check if content includes role info (historical messages from server)
+            const isContentWithRole =
+              typeof chunk.data === "object" &&
+              chunk.data !== null &&
+              "role" in chunk.data;
+
+            if (isContentWithRole) {
+              const { content, role } = chunk.data as ContentWithRole;
+              // Historical messages from server replay
+              if (role === "user") {
+                // User messages should already exist in store, skip
+                break;
+              }
+              // For assistant historical messages, add as complete message
+              // (not streaming - we don't want to merge multiple historical messages)
+              const historicalMsg: ChatMessage = {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content,
+                timestamp: chunk.timestamp,
+              };
+              addMessage(historicalMsg);
+            } else {
+              // New streaming content (no role = from current assistant response)
+              if (!isStreaming) {
+                setIsStreaming(true);
+                setIsLoading(true);
+              }
+              appendStreamingContent(chunk.data as string);
             }
-            appendStreamingContent(chunk.data as string);
             break;
           }
           case "reasoning": {
@@ -148,7 +169,6 @@ export function ChatPage({ agentName, roomId }: ChatPageProps) {
                 arguments: toolCall.arguments,
               });
             }
-            hasAutoSentResults.current = false;
             break;
           }
           case "tool_result": {
@@ -161,6 +181,26 @@ export function ChatPage({ agentName, roomId }: ChatPageProps) {
             if (existing) {
               existing.result = result.result;
               existing.error = result.error;
+            }
+            // Update streaming message metadata in real-time so UI shows results immediately
+            if (streamingMessageId) {
+              const updatedToolCalls = Array.from(
+                pendingToolResults.current.values(),
+              ).map((tc) => ({
+                id: tc.id,
+                name: tc.name,
+                arguments: JSON.parse(tc.arguments || "{}"),
+                status: (tc.error ? "error"
+                : tc.result !== undefined ? "completed"
+                : "pending") as "pending" | "running" | "completed" | "error",
+                result: tc.result,
+                error: tc.error,
+              }));
+              updateMessage(streamingMessageId, {
+                metadata: {
+                  toolCalls: updatedToolCalls,
+                },
+              });
             }
             break;
           }
@@ -225,7 +265,6 @@ export function ChatPage({ agentName, roomId }: ChatPageProps) {
 
     // Reset accumulated tool calls
     pendingToolResults.current.clear();
-    hasAutoSentResults.current = false;
   }, [
     inputValue,
     isLoading,
@@ -269,11 +308,6 @@ export function ChatPage({ agentName, roomId }: ChatPageProps) {
     agent.send("clear_history");
     // Note: Agent state clearing should be handled server-side
   }, [clearMessages]);
-
-  // Ensure connection is established immediately on mount
-  useEffect(() => {
-    // The useAgent hook connects automatically
-  }, [agent]);
 
   // Reset loading states on mount to fix UI lock after refresh
   useEffect(() => {
@@ -335,26 +369,52 @@ export function ChatPage({ agentName, roomId }: ChatPageProps) {
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-4xl mx-auto space-y-4">
-          {/* Render messages */}
-          {messages.map((message, index) => {
-            const isLastAssistant =
-              index === messages.length - 1 && message.role === "assistant";
-            const displayMessage =
-              isLastAssistant && isStreaming
-                ? { ...message, content: streamingContent || message.content }
+          {/* Render messages - filter out completed empty assistant messages */}
+          {messages
+            .filter((message, index) => {
+              // Check if this is the currently streaming message
+              const isLastAssistant =
+                index === messages.length - 1 && message.role === "assistant";
+              const isStreamingThisMessage = isStreaming && isLastAssistant;
+
+              // Always show streaming messages (even if empty) so bubble appears during thinking
+              if (isStreamingThisMessage) return true;
+
+              // For completed assistant messages, require content/reasoning/tool calls
+              if (message.role !== "assistant") return true;
+              const hasContent =
+                typeof message.content === "string" ?
+                  message.content.trim().length > 0
+                : Boolean(message.content);
+              const hasReasoning = Boolean(message.metadata?.reasoning);
+              const hasToolCalls = Boolean(
+                message.metadata?.toolCalls &&
+                message.metadata.toolCalls.length > 0,
+              );
+              return hasContent || hasReasoning || hasToolCalls;
+            })
+            .map((message) => {
+              // Check if this is the currently streaming assistant message
+              const isLastAssistant =
+                isStreaming &&
+                message.role === "assistant" &&
+                message.id === streamingMessageId;
+              const displayMessage =
+                isLastAssistant ?
+                  { ...message, content: streamingContent || message.content }
                 : message;
 
-            return (
-              <MessageBubble
-                key={message.id}
-                message={displayMessage}
-                isStreaming={isStreaming && isLastAssistant}
-                streamingReasoning={
-                  isLastAssistant ? streamingReasoning : undefined
-                }
-              />
-            );
-          })}
+              return (
+                <MessageBubble
+                  key={message.id}
+                  message={displayMessage}
+                  isStreaming={isLastAssistant}
+                  streamingReasoning={
+                    isLastAssistant ? streamingReasoning : undefined
+                  }
+                />
+              );
+            })}
 
           {/* Error message */}
           {error && (
@@ -378,9 +438,9 @@ export function ChatPage({ agentName, roomId }: ChatPageProps) {
               <textarea
                 ref={textareaRef}
                 placeholder={
-                  isConnected
-                    ? "Type your message... (Shift+Enter for new line)"
-                    : "Connecting to agent..."
+                  isConnected ?
+                    "Type your message... (Shift+Enter for new line)"
+                  : "Connecting to agent..."
                 }
                 rows={1}
                 value={inputValue}
@@ -396,11 +456,11 @@ export function ChatPage({ agentName, roomId }: ChatPageProps) {
               className="px-6 py-3 bg-linear-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-medium rounded-2xl transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
             >
               <span>
-                {!isConnected
-                  ? "Connecting..."
-                  : isLoading
-                    ? "Sending..."
-                    : "Send"}
+                {!isConnected ?
+                  "Connecting..."
+                : isLoading ?
+                  "Sending..."
+                : "Send"}
               </span>
               <svg
                 className="w-5 h-5"

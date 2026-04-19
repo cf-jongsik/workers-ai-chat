@@ -1,3 +1,8 @@
+export interface ContentWithRole {
+  content: string;
+  role: "user" | "assistant";
+}
+
 export interface StreamChunk {
   type:
     | "content"
@@ -6,7 +11,7 @@ export interface StreamChunk {
     | "tool_result"
     | "done"
     | "error";
-  data: string | ToolCallChunk | ToolResultChunk | null;
+  data: string | ContentWithRole | ToolCallChunk | ToolResultChunk | null;
   timestamp: number;
 }
 

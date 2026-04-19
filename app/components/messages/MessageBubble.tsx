@@ -190,35 +190,42 @@ const markdownOptions = {
     },
     table: {
       component: ({ children }: { children: React.ReactNode }) => (
-        <div className="overflow-x-auto my-4 rounded-lg border border-orange-500/20">
-          <table className="w-full text-sm">{children}</table>
+        <div className="overflow-x-auto my-4 rounded-lg border border-orange-500/30 shadow-lg shadow-black/20">
+          <table className="w-full text-sm border-collapse">{children}</table>
         </div>
       ),
     },
     thead: {
       component: ({ children }: { children: React.ReactNode }) => (
-        <thead className="bg-linear-to-r from-orange-500/20 to-amber-500/10 text-orange-200">
+        <thead className="bg-linear-to-r from-orange-500/25 to-amber-500/15 text-orange-100">
           {children}
         </thead>
       ),
     },
     th: {
       component: ({ children }: { children: React.ReactNode }) => (
-        <th className="px-4 py-2 text-left font-semibold border-b border-orange-500/30">
+        <th className="px-4 py-3 text-left font-bold border-b-2 border-orange-500/40 text-orange-100 tracking-wide">
           {children}
         </th>
       ),
     },
     td: {
       component: ({ children }: { children: React.ReactNode }) => (
-        <td className="px-4 py-2 border-b border-white/5 text-gray-200">
+        <td className="px-4 py-3 border-b border-white/10 text-gray-100 leading-relaxed">
           {children}
         </td>
       ),
     },
     tr: {
       component: ({ children }: { children: React.ReactNode }) => (
-        <tr className="hover:bg-orange-500/5 transition-colors">{children}</tr>
+        <tr className="even:bg-white/3 hover:bg-orange-500/10 transition-colors duration-200">
+          {children}
+        </tr>
+      ),
+    },
+    tbody: {
+      component: ({ children }: { children: React.ReactNode }) => (
+        <tbody className="bg-zinc-900/50">{children}</tbody>
       ),
     },
     br: {
@@ -273,7 +280,9 @@ export const MessageBubble = memo(function MessageBubble({
         <div
           className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${avatarStyles} shadow-lg`}
         >
-          {isUser ? <UserIcon /> : <AssistantIcon />}
+          {isUser ?
+            <UserIcon />
+          : <AssistantIcon />}
         </div>
 
         {/* Message Bubble */}

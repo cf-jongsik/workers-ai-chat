@@ -24,7 +24,6 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const upgrade = request.headers.get("Upgrade");
     const url = new URL(request.url);
-
     if (
       url.protocol === "ws:" ||
       url.protocol === "wss:" ||

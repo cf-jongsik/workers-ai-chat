@@ -1,7 +1,7 @@
 export { ToolRegistry, toolRegistry } from "./registry";
 export {
   registerBuiltInTools,
-  fetchTool,
+  browserTool,
   calculatorTool,
   datetimeTool,
 } from "./built-in";

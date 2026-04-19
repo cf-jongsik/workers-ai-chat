@@ -15,6 +15,8 @@ import { createStreamingProcessor } from "../streaming/processor";
 import { decodeAIStream } from "../lib/streamDecoder";
 import { prompts } from "./prompts";
 
+const modelId = "@cf/nvidia/nemotron-3-120b-a12b";
+
 export class ChatAgent extends Agent<Env, ChatAgentState> {
   initialState: ChatAgentState = {
     messages: [],
@@ -26,8 +28,8 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
     if (this.state.messages.length > 0) {
       for (const msg of this.state.messages) {
         const chunk: StreamChunk = {
-          type: msg.role === "assistant" ? "content" : "content",
-          data: msg.content,
+          type: "content",
+          data: { content: msg.content, role: msg.role },
           timestamp: msg.timestamp,
         };
         connection.send(JSON.stringify(chunk));
@@ -125,8 +127,7 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
       // Call AI service with streaming
       try {
         const stream = await AI.run(
-          // @ts-ignore - AI streaming API
-          "@cf/nvidia/nemotron-3-120b-a12b",
+          modelId,
           {
             messages: [
               { role: "system", content: prompts },
@@ -244,12 +245,34 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
 
               toolCall.result = result.data;
               toolCall.error = result.error;
+
+              // Send tool result to client in real-time
+              streamingProcessor.sendChunk({
+                type: "tool_result",
+                data: {
+                  toolCallId: toolCall.id,
+                  result: result.data,
+                  error: result.error,
+                },
+                timestamp: Date.now(),
+              });
             } catch (toolError) {
               const error =
-                toolError instanceof Error
-                  ? toolError.message
-                  : String(toolError);
+                toolError instanceof Error ?
+                  toolError.message
+                : String(toolError);
               toolCall.error = error;
+
+              // Send tool error to client in real-time
+              streamingProcessor.sendChunk({
+                type: "tool_result",
+                data: {
+                  toolCallId: toolCall.id,
+                  result: null,
+                  error: error,
+                },
+                timestamp: Date.now(),
+              });
             }
           }
 
@@ -262,16 +285,16 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
             metadata: {
               reasoning: fullReasoning || undefined,
               toolCalls:
-                toolCalls.length > 0
-                  ? toolCalls.map((tc) => ({
-                      id: tc.id,
-                      name: tc.name,
-                      arguments: JSON.parse(tc.arguments || "{}"),
-                      status: tc.error ? "error" : "completed",
-                      result: tc.result,
-                      error: tc.error,
-                    }))
-                  : undefined,
+                toolCalls.length > 0 ?
+                  toolCalls.map((tc) => ({
+                    id: tc.id,
+                    name: tc.name,
+                    arguments: JSON.parse(tc.arguments || "{}"),
+                    status: tc.error ? "error" : "completed",
+                    result: tc.result,
+                    error: tc.error,
+                  }))
+                : undefined,
             },
           };
 
@@ -302,7 +325,6 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
             timestamp: Date.now(),
           };
 
-          // Add tool results to state
           this.setState({
             messages: [...this.state.messages, toolResultsMessage],
             lastUpdate: new Date(),
@@ -317,8 +339,7 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
           try {
             // AI streaming API
             const followUpStream = await AI.run(
-              //@ts-ignore
-              "@cf/nvidia/nemotron-3-120b-a12b",
+              modelId,
               {
                 messages: [
                   { role: "system", content: prompts },
@@ -387,9 +408,9 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
 
             // Check for token limit error
             const errorMessage =
-              followUpError instanceof Error
-                ? followUpError.message
-                : String(followUpError);
+              followUpError instanceof Error ?
+                followUpError.message
+              : String(followUpError);
             const isTokenLimitError =
               errorMessage.includes(
                 "exceeded this model context window limit",
