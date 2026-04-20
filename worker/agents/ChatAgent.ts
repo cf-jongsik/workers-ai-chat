@@ -258,9 +258,9 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
               });
             } catch (toolError) {
               const error =
-                toolError instanceof Error ?
-                  toolError.message
-                : String(toolError);
+                toolError instanceof Error
+                  ? toolError.message
+                  : String(toolError);
               toolCall.error = error;
 
               // Send tool error to client in real-time
@@ -285,16 +285,16 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
             metadata: {
               reasoning: fullReasoning || undefined,
               toolCalls:
-                toolCalls.length > 0 ?
-                  toolCalls.map((tc) => ({
-                    id: tc.id,
-                    name: tc.name,
-                    arguments: JSON.parse(tc.arguments || "{}"),
-                    status: tc.error ? "error" : "completed",
-                    result: tc.result,
-                    error: tc.error,
-                  }))
-                : undefined,
+                toolCalls.length > 0
+                  ? toolCalls.map((tc) => ({
+                      id: tc.id,
+                      name: tc.name,
+                      arguments: JSON.parse(tc.arguments || "{}"),
+                      status: tc.error ? "error" : "completed",
+                      result: tc.result,
+                      error: tc.error,
+                    }))
+                  : undefined,
             },
           };
 
@@ -408,9 +408,9 @@ export class ChatAgent extends Agent<Env, ChatAgentState> {
 
             // Check for token limit error
             const errorMessage =
-              followUpError instanceof Error ?
-                followUpError.message
-              : String(followUpError);
+              followUpError instanceof Error
+                ? followUpError.message
+                : String(followUpError);
             const isTokenLimitError =
               errorMessage.includes(
                 "exceeded this model context window limit",
